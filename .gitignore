@@ -1,0 +1,25 @@
+# Build directories
+cmake-build-*/
+
+# IDEs
+.idea/
+.vs/
+
+# Compiled binaries
+*.exe
+*.dll
+*.lib
+*.ilk
+*.pdb
+*.obj
+
+# CMake junk
+CMakeCache.txt
+CMakeFiles/
+*.ninja
+build.ninja
+cmake_install.cmake
+
+# OS junk
+.DS_Store
+Thumbs.db

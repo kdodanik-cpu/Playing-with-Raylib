@@ -68,7 +68,6 @@ struct World {
                 nextMinPlayerPos.z < maxColliderPos.z
                 ) {
                 if (
-                    speed.x > 0.0f &&
                     maxPlayerPos.x <= minColliderPos.x && // Player still left of the collider in current pos?
                     nextMaxPlayerPos.x > minColliderPos.x // Will next predicted position penetrate? (Approach vulnerable to tunneling)
                     ) {
@@ -76,7 +75,6 @@ struct World {
                     speed.x = 0.0f;
                     std::cout << "left side collision occured\n";
                     } else if (
-                        speed.x < 0.0f &&
                         minPlayerPos.x >= maxColliderPos.x && // Player still to the right of the collider?
                         nextMinPlayerPos.x < maxColliderPos.x // Will next prediction position penetrate
                         ) {
@@ -145,32 +143,34 @@ struct World {
             Vector3 minColliderPos = collider.position - collider.dimensions * 0.5f;
 
             if (
-                // Ask whether current x and y overlap with any iterated collider
+                // Will next pos trigger overlap with any iterated collider?
                 maxPlayerPos.x > minColliderPos.x &&
                 minPlayerPos.x < maxColliderPos.x &&
                 maxPlayerPos.z > minColliderPos.z &&
                 minPlayerPos.z < maxColliderPos.z &&
-                // Ask whether nextY will overlap as well,
                 nextMaxPlayerPos.y > minColliderPos.y &&
                 nextMinPlayerPos.y < maxColliderPos.y
                 ) { //If so...
+                std::cout << "Current minPlayerY: " << minPlayerPos.y << "\n";
+                std::cout << "nextMinPlayerY: " << nextMinPlayerPos.y << "\n";
+                std::cout << "maxColliderY: " << maxColliderPos.y << "\n";
                 if (// Will the player collide from the bottom of the collider?
-                    speed.y > 0.0f &&
+                    //speed.y > 0.0f &&
                     maxPlayerPos.y <= minColliderPos.y &&
                     nextMaxPlayerPos.y > minColliderPos.y
                     ) {
                     speed.y = 0.0f;
                     nextPos.y = minColliderPos.y - playerPtr->dimensions.y * 0.5f;
-                    std::cout << "Bottom collision occured\n";
                 } else if (// Or from the top?
-                    speed.y < 0.0f &&
-                    minPlayerPos.y >= maxColliderPos.y &&
+                    //speed.y < 0.0f &&
+                    const float EPS = 0.001f; // Need to use this, otherwise imprecision will cause this not to trigger when it shouldn't
+                    minPlayerPos.y >= maxColliderPos.y -EPS &&
                     nextMinPlayerPos.y < maxColliderPos.y
                     ) {
                     speed.y = 0;
                     nextPos.y = maxColliderPos.y + playerPtr->dimensions.y * 0.5f;
                     playerPtr->isResting = true;
-                    std::cout << "Top collision occured\n";
+                    //std::cout << collider.position.x << ", " << collider.position.y << ", " << collider.position.z << "\n";
                 }
 
             }
@@ -285,17 +285,17 @@ int main() {
         else if (IsKeyDown(KEY_D)) speed.x = 10.0f;
         else speed.x = 0.0f;
 
-
-        // Apply gravity
-        speed.y -= 10.5f * GetFrameTime();
-        // Handle movement and collision
+        // Handle lateral movement and collision
         nextPos.x = player.position.x + speed.x * GetFrameTime();
         world.resolveX(nextPos, speed);
         nextPos.z = player.position.z + speed.z * GetFrameTime();
         world.resolveZ(nextPos, speed);
+        // Handle vertical movement and collision
+        // Apply gravity
+        speed.y -= 10.5f * GetFrameTime();
+
         nextPos.y = player.position.y + speed.y * GetFrameTime();
         world.resolveY(nextPos, speed);
-
         // Now that Y has determined if player is resting, add jump logic
         if (IsKeyPressed(KEY_SPACE) && player.isResting) speed.y = 7.0f;
 

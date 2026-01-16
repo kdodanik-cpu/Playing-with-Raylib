@@ -6,23 +6,20 @@
 #include <ranges>
 #include <ctime>
 
-
-
-
 constexpr float GRAVITY = 0.1f;
 float acceleration = 10.f;
 Vector3 speed = {0.0f, 0.0f, 0.0f};
 
-
 struct Player {
+    // Constructor
+    Player(const Vector3& pos, const Vector3& dims)
+        : position(pos), dimensions(dims){}
     // Members
     Vector3 position;
     Vector3 dimensions;
     Color color = RED;
     bool isResting = false;
-    // Constructor
-    Player(const Vector3& pos, const Vector3& dims)
-        : position(pos), dimensions(dims){}
+
 };
 
 struct Collider {
@@ -39,23 +36,23 @@ struct Collider {
 struct World {
     // Constructor
     World(std::vector<Collider>& colliders, Player& player)
-        : collidersPtr(&colliders), playerPtr(&player) {}
-
+        : colliders(colliders), player(player) {}
     // Members
-    std::vector<Collider>* collidersPtr;
-    Player* playerPtr;
-
+    std::vector<Collider>& colliders;
+    Player& player;
 
     // Functions to resolve collision
+
+    // Repeated same logic for Z axis
     void resolveX(Vector3& nextPos, Vector3& speed)
     {
         // Current max and min bounds for player
-        Vector3 maxPlayerPos = playerPtr->position + playerPtr->dimensions * 0.5f;
-        Vector3 minPlayerPos = playerPtr->position - playerPtr->dimensions * 0.5f;
+        Vector3 maxPlayerPos = player.position + player.dimensions * 0.5f;
+        Vector3 minPlayerPos = player.position - player.dimensions * 0.5f;
         // Obtain the next max and min bounds of the player
-        Vector3 nextMaxPlayerPos = nextPos + playerPtr->dimensions * 0.5f;
-         Vector3 nextMinPlayerPos = nextPos - playerPtr->dimensions * 0.5f;
-        for (const Collider& collider : *collidersPtr) {
+        Vector3 nextMaxPlayerPos = nextPos + player.dimensions * 0.5f;
+        Vector3 nextMinPlayerPos = nextPos - player.dimensions * 0.5f;
+        for (const Collider& collider : colliders) {
             Vector3 maxColliderPos = collider.position + collider.dimensions * 0.5f;
             Vector3 minColliderPos = collider.position - collider.dimensions * 0.5f;
             // Check Z and Y gating for next position
@@ -66,38 +63,36 @@ struct World {
                 // Z overlap
                 nextMaxPlayerPos.z > minColliderPos.z &&
                 nextMinPlayerPos.z < maxColliderPos.z
-                ) {
+            ) {
                 if (
                     maxPlayerPos.x <= minColliderPos.x && // Player still left of the collider in current pos?
                     nextMaxPlayerPos.x > minColliderPos.x // Will next predicted position penetrate? (Approach vulnerable to tunneling)
-                    ) {
-                    nextPos.x = minColliderPos.x - playerPtr->dimensions.x * 0.5f; // If true, clamp nextPos to appropriate bounds
+                ) {
+                    nextPos.x = minColliderPos.x - player.dimensions.x * 0.5f; // If true, clamp nextPos to appropriate bounds
                     speed.x = 0.0f;
                     std::cout << "left side collision occured\n";
-                    } else if (
-                        minPlayerPos.x >= maxColliderPos.x && // Player still to the right of the collider?
-                        nextMinPlayerPos.x < maxColliderPos.x // Will next prediction position penetrate
-                        ) {
-                        nextPos.x = maxColliderPos.x + playerPtr->dimensions.x * 0.5f;
-                        speed.x = 0.0f;
-                        std::cout << "right side collision occured\n";
-                    }
+                } else if (
+                    minPlayerPos.x >= maxColliderPos.x && // Player still to the right of the collider?
+                    nextMinPlayerPos.x < maxColliderPos.x // Will next prediction position penetrate
+                ) {
+                    nextPos.x = maxColliderPos.x + player.dimensions.x * 0.5f;
+                    speed.x = 0.0f;
+                    std::cout << "right side collision occured\n";
+                }
 
-                   }
+            }
         }
         // Resolve X
-        playerPtr->position.x = nextPos.x;
+        player.position.x = nextPos.x;
     }
 
-    // Repeated same logic for Z axis
     void resolveZ(Vector3& nextPos, Vector3& speed) {
+        Vector3 maxPlayerPos = player.position + player.dimensions * 0.5f;
+        Vector3 minPlayerPos = player.position - player.dimensions * 0.5f;
+        Vector3 nextMaxPlayerPos = nextPos + player.dimensions * 0.5f;
+        Vector3 nextMinPlayerPos = nextPos - player.dimensions * 0.5f;
 
-        Vector3 maxPlayerPos = playerPtr->position + playerPtr->dimensions * 0.5f;
-        Vector3 minPlayerPos = playerPtr->position - playerPtr->dimensions * 0.5f;
-        Vector3 nextMaxPlayerPos = nextPos + playerPtr->dimensions * 0.5f;
-        Vector3 nextMinPlayerPos = nextPos - playerPtr->dimensions * 0.5f;
-
-        for (const Collider& collider : *collidersPtr) {
+        for (const Collider& collider : colliders) {
             Vector3 maxColliderPos = collider.position + collider.dimensions * 0.5f;
             Vector3 minColliderPos = collider.position - collider.dimensions * 0.5f;
 
@@ -116,7 +111,7 @@ struct World {
                     nextMinPlayerPos.z < maxColliderPos.z
                 ) {
                     speed.z = 0.0f;
-                    nextPos.z = maxColliderPos.z + playerPtr->dimensions.z * 0.5f;
+                    nextPos.z = maxColliderPos.z + player.dimensions.z * 0.5f;
                     std::cout << "Rear side collision occured\n";
                 } else if (
                     speed.z > 0 &&
@@ -124,21 +119,21 @@ struct World {
                     nextMaxPlayerPos.z > minColliderPos.z
                 ) {
                     speed.z = 0.0f;
-                    nextPos.z = minColliderPos.z - playerPtr->dimensions.z * 0.5f;
+                    nextPos.z = minColliderPos.z - player.dimensions.z * 0.5f;
                     std::cout << "Front collision occured\n";
                 }
             }
         }
-        playerPtr->position.z = nextPos.z;
+        player.position.z = nextPos.z;
     }
 
     void resolveY(Vector3& nextPos, Vector3& speed) {
-        Vector3 maxPlayerPos = playerPtr->position + playerPtr->dimensions * 0.5f;
-        Vector3 minPlayerPos = playerPtr->position - playerPtr->dimensions * 0.5f;
-        Vector3 nextMaxPlayerPos = nextPos + playerPtr->dimensions * 0.5f;
-        Vector3 nextMinPlayerPos = nextPos - playerPtr->dimensions * 0.5f;
+        Vector3 maxPlayerPos = player.position + player.dimensions * 0.5f;
+        Vector3 minPlayerPos = player.position - player.dimensions * 0.5f;
+        Vector3 nextMaxPlayerPos = nextPos + player.dimensions * 0.5f;
+        Vector3 nextMinPlayerPos = nextPos - player.dimensions * 0.5f;
 
-        for (const Collider& collider : *collidersPtr) {
+        for (const Collider& collider : colliders) {
             Vector3 maxColliderPos = collider.position + collider.dimensions * 0.5f;
             Vector3 minColliderPos = collider.position - collider.dimensions * 0.5f;
 
@@ -160,7 +155,7 @@ struct World {
                     nextMaxPlayerPos.y > minColliderPos.y
                     ) {
                     speed.y = 0.0f;
-                    nextPos.y = minColliderPos.y - playerPtr->dimensions.y * 0.5f;
+                    nextPos.y = minColliderPos.y - player.dimensions.y * 0.5f;
                 } else if (// Or from the top?
                     //speed.y < 0.0f &&
                     const float EPS = 0.001f; // Need to use this, otherwise imprecision will cause this not to trigger when it shouldn't
@@ -168,26 +163,23 @@ struct World {
                     nextMinPlayerPos.y < maxColliderPos.y
                     ) {
                     speed.y = 0;
-                    nextPos.y = maxColliderPos.y + playerPtr->dimensions.y * 0.5f;
-                    playerPtr->isResting = true;
+                    nextPos.y = maxColliderPos.y + player.dimensions.y * 0.5f;
+                    player.isResting = true;
                     //std::cout << collider.position.x << ", " << collider.position.y << ", " << collider.position.z << "\n";
                 }
-
             }
-
         }
-        playerPtr->position.y = nextPos.y;
+        player.position.y = nextPos.y;
     }
-
 };
 
 struct Renderer {
-    World world;
+    const World& world;
     Renderer(const World& world): world(world) {};
 
     void Draw() const {
 
-        for (Collider collider : *world.collidersPtr) {
+        for (Collider collider : world.colliders) {
             DrawCube(collider.position,
                 collider.dimensions.x,
                 collider.dimensions.y,
@@ -200,52 +192,64 @@ struct Renderer {
                 BLACK);
         }
 
-        DrawCube(world.playerPtr->position,
-            world.playerPtr->dimensions.x,
-            world.playerPtr->dimensions.y,
-            world.playerPtr->dimensions.z,
-            world.playerPtr->color);
-        DrawCubeWires(world.playerPtr->position,
-            world.playerPtr->dimensions.x,
-            world.playerPtr->dimensions.y,
-            world.playerPtr->dimensions.z,
+        DrawCube(world.player.position,
+            world.player.dimensions.x,
+            world.player.dimensions.y,
+            world.player.dimensions.z,
+            world.player.color);
+        DrawCubeWires(world.player.position,
+            world.player.dimensions.x,
+            world.player.dimensions.y,
+            world.player.dimensions.z,
             BLACK);
 
     };
 };
 
-int main() {
-    const int screenWidth = 800;
-    const int screenHeight = 600;
+// Functions to handle movement
+Vector3 GetCameraForwardXZ(const Camera& cam)
+{
+    Vector3 forward = Vector3Subtract(cam.target, cam.position);
+    forward.y = 0.0f;
+    return Vector3Normalize(forward);
+}
 
+Vector3 GetCameraRightXZ(const Camera& cam)
+{
+    Vector3 forward = GetCameraForwardXZ(cam);
+    return Vector3Normalize(Vector3CrossProduct(forward, {0.0f, 1.0f, 0.0f}));
+}
+
+const float MIN_HEIGHT = 0.5f;
+
+int main() {
+    const int screenWidth = 1500;
+    const int screenHeight = 1000;
     InitWindow(screenWidth, screenHeight, "Isometric Camera Demo");
 
     // Create assets
     // Isometric / orthographic camera
     Camera camera = {0};
-    camera.position = {10.0f, 10.0f, 10.0f};  // Camera position in world
-    camera.target   = {0.0f, 0.0f, 0.0f};    // Where the camera looks
-    camera.up       = {0.0f, 1.0f, 0.0f};    // Up vector
-    camera.fovy     = 45.0f;                 // Field of view (unused in ortho)
-
-
+    camera.position = { 11.0f, 11.0f, 11.0f };   // equal X, Y, Z
+    camera.target   = { 0.0f, 0.0f, 0.0f };
+    camera.up       = { 0.0f, 1.0f, 0.0f };
+    camera.fovy     = 15.0f;                    // ignored for orthographic
+    camera.projection = CAMERA_ORTHOGRAPHIC;
     // Cube
     Vector3 cubePos = {0.0f, 1.0f, 0.0f};
-    Vector3 cubeDim = {1.0f, 1.0f, 1.0f};
+    Vector3 cubeDim = {0.5f, 1.0f, 0.5f};
     Player player(cubePos, cubeDim);
-
-
     // Generate colliders for the game
     // Ground level
     Vector3 groundDimensions = {30.0f, 0.05f, 30.0f};
     Vector3 groundPos = {0.0f, 0.475f, 0.0f};
     Collider groundCollider = {groundPos, groundDimensions};
     std::vector<Collider> colliders = {groundCollider};
-    int numberOfPlatforms = 1000;
+    int numberOfPlatforms = 15;
     // Randomly generated platforms
-    auto frand = [](float max) {
+    /*auto frand = [](float max) {
         return (float(rand()) / float(RAND_MAX)) * max;
-    };
+    };*/
     auto frandSigned = [](float range) {
         return ((float(rand()) / float(RAND_MAX)) * 2.0f - 1.0f) * range;
     };
@@ -254,17 +258,18 @@ int main() {
     for (int i = 0; i < numberOfPlatforms; i++) {
 
         Vector3 pos ={
-            frandSigned(40.0f),
-            frandSigned(7.0f),
-            frandSigned(40.0f),
+            frandSigned(groundCollider.position.x + groundDimensions.x * 0.5f),
+            0.5f,
+            frandSigned(groundCollider.position.z + groundDimensions.z * 0.5f),
         };
         Vector3 dim = {
-            frand(2.0f),
-            0.05f,
-            frand(2.0f),
+            1.0f,
+            10.0f,
+            1.0f,
         };
 
         Collider collider = {pos, dim};
+        collider.color = RED;
         colliders.push_back(collider);
     }
 
@@ -273,56 +278,130 @@ int main() {
     World world(colliders, player);
     Renderer renderer(world);
     SetTargetFPS(60);
-    float timer = 0.0f;
+    DisableCursor();
+    float GameOverTimer = 0.0f;
+    float textTimer = 0.0f;
     // GAME LOOP
-    while (!WindowShouldClose() && timer < 3.0f) {
-        player.isResting = false; // reset at the start of each, resolveY will determine whether jump allowed or not
-        // Simple movement controls
-        if (IsKeyDown(KEY_W)) speed.z = -10.0f;
-        else if (IsKeyDown(KEY_S)) speed.z = 10.0f;
-        else speed.z = 0.0f;
-        if (IsKeyDown(KEY_A)) speed.x = -10.0f;
-        else if (IsKeyDown(KEY_D)) speed.x = 10.0f;
-        else speed.x = 0.0f;
 
-        // Handle lateral movement and collision
-        nextPos.x = player.position.x + speed.x * GetFrameTime();
-        world.resolveX(nextPos, speed);
-        nextPos.z = player.position.z + speed.z * GetFrameTime();
-        world.resolveZ(nextPos, speed);
-        // Handle vertical movement and collision
-        // Apply gravity
-        speed.y -= 10.5f * GetFrameTime();
+        while (!WindowShouldClose()) {
+            if (GameOverTimer < 3.0f){
+                if (IsCursorOnScreen()) DisableCursor();
+                Vector3 move = {0};
+                Vector3 forward = GetCameraForwardXZ(camera);
+                Vector3 right   = GetCameraRightXZ(camera);
 
-        nextPos.y = player.position.y + speed.y * GetFrameTime();
-        world.resolveY(nextPos, speed);
-        // Now that Y has determined if player is resting, add jump logic
-        if (IsKeyPressed(KEY_SPACE) && player.isResting) speed.y = 7.0f;
+                if (IsKeyDown(KEY_W)) move = Vector3Add(move, forward);
+                if (IsKeyDown(KEY_S)) move = Vector3Subtract(move, forward);
+                if (IsKeyDown(KEY_D)) move = Vector3Add(move, right);
+                if (IsKeyDown(KEY_A)) move = Vector3Subtract(move, right);
 
-        // Change player color depending on state
-        if (player.isResting) player.color = GREEN; else player.color = RED;
+                move = Vector3Normalize(move);
 
-        // Make the camera follow the player
-        Vector3 offset = {10.0f, 10.0f, 10.0f}; // Keep the same distance from the player the camera was initialized with
-        camera.position = player.position + offset;
-        camera.target = player.position;
-        // Game over condition
-        if (player.position.y < 1.0f && !player.isResting) {
-            timer += 1.0f * GetFrameTime();
-        } else {timer = 0.0f;}
+                speed.x = move.x * 10.0f;
+                speed.z = move.z * 10.0f;
 
-        // Raylib functions to setup everything
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
-        BeginMode3D(camera);
-        renderer.Draw();
-        DrawGrid(10, 1.0f); // 10x10 grid
-        EndMode3D();
-        DrawText("Use WASD to move the cube", 10, 10, 20, DARKGRAY);
-        DrawFPS(600, 10);
-        EndDrawing();
-    }
+                player.isResting = false; // reset at the start of each, resolveY will determine whether jump allowed or not
+                /*// Simple movement controls
+                if (IsKeyDown(KEY_W)) speed.z = -10.0f;
+                else if (IsKeyDown(KEY_S)) speed.z = 10.0f;
+                else speed.z = 0.0f;
+                if (IsKeyDown(KEY_A)) speed.x = -10.0f;
+                else if (IsKeyDown(KEY_D)) speed.x = 10.0f;
+                else speed.x = 0.0f;*/
 
-    CloseWindow();
-    return 0;
-}
+                // Handle lateral movement and collision
+                nextPos.x = player.position.x + speed.x * GetFrameTime();
+                world.resolveX(nextPos, speed);
+                nextPos.z = player.position.z + speed.z * GetFrameTime();
+                world.resolveZ(nextPos, speed);
+                // Handle vertical movement and collision
+                // Apply gravity
+                speed.y -= 10.5f * GetFrameTime();
+
+                nextPos.y = player.position.y + speed.y * GetFrameTime();
+                world.resolveY(nextPos, speed);
+                // Now that Y has determined if player is resting, add jump logic
+                if (IsKeyPressed(KEY_SPACE) && player.isResting) speed.y = 7.0f;
+
+                // Change player color depending on state
+                if (player.isResting) player.color = GREEN; else player.color = RED;
+
+                // Make camera follow player
+                Vector3 offset = {11.0f, 11.0f, 11.0f};
+                camera.position = Vector3Add(player.position, offset);
+                camera.target = player.position;
+
+                // Game over condition
+                if (player.position.y < 1.0f && !player.isResting) {
+                    GameOverTimer += 1.0f * GetFrameTime();
+                } else {GameOverTimer = 0.0f;}
+
+                // Raylib functions to setup everything
+                BeginDrawing();
+                ClearBackground(RAYWHITE);
+                BeginMode3D(camera);
+                renderer.Draw();
+                DrawCube({5.0f, 1.0f, 5.0f}, 0.5f, 0.5f, 0.5f, BLACK);
+                DrawGrid(10, 1.0f); // 10x10 grid
+                EndMode3D();
+                DrawText("Use WASD to move the cube", 10, 10, 20, DARKGRAY);
+                if (player.position.x < 6.0f &&
+                    player.position.x > 4.0f &&
+                    player.position.z < 6.0f &&
+                    player.position.z > 4.0f &&
+                    player.position.y > 0.9f &&
+                    player.position.y < 1.5f) {
+                    DrawText("Press E to speak", 500, 500, 20, YELLOW );
+                    if (IsKeyPressed(KEY_E)) { textTimer = 3.0f;}
+                    }
+                if (textTimer > 0.0f) {
+                    DrawText("Hello",
+                        GetWorldToScreen({5.0f, 1.0f, 5.0f},camera).x,
+                        GetWorldToScreen({5.0f, 1.0f, 5.0f},camera).y - 50,                            15,
+                        RED);
+                    textTimer -= 1.0f * GetFrameTime();
+                    }
+                if (textTimer < 0.0f) textTimer = 0.0f;
+                DrawFPS(600, 10);
+                EndDrawing();
+                std::cout << GameOverTimer << std::endl;
+            } else {
+                if (IsCursorHidden())EnableCursor();
+                BeginDrawing();
+                ClearBackground(BLACK);
+                DrawText("GAME OVER",
+                    GetScreenWidth()/2 - MeasureText("GAME OVER", 50)/2,
+                    GetScreenHeight()/2 - 200, 50,
+                    RED);
+                DrawRectangle(GetScreenWidth()/2 - 75, GetScreenHeight()/2 - 75/2, 150, 75, GRAY);
+
+                Color textColor;
+
+                if (GetMousePosition().x > GetScreenWidth()/2 -75 &&
+                    GetMousePosition().x < GetScreenWidth()/2 + 75 &&
+                    GetMousePosition().y > GetScreenHeight()/2 -75/2 &&
+                    GetMousePosition().y < GetScreenHeight()/2 + 75/2) {
+                    textColor = RED;
+                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        player.position = {
+                            0.0f,
+                            groundCollider.position.y + groundDimensions.y * 0.5f + player.dimensions.y * 0.5f,
+                            0.f};
+                        GameOverTimer = 0.0f;
+                    }
+
+                } else {textColor = GREEN;}
+
+                DrawText("Restart",
+                    GetScreenWidth()/2 - MeasureText("Restart", 20)/2,
+                    GetScreenHeight()/2,
+                    20,
+                    textColor );
+                EndDrawing();
+            }
+        }
+
+            CloseWindow();
+            return 0;
+        }
+

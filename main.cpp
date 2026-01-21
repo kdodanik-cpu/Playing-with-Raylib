@@ -70,14 +70,12 @@ struct World {
                 ) {
                     nextPos.x = minColliderPos.x - player.dimensions.x * 0.5f; // If true, clamp nextPos to appropriate bounds
                     speed.x = 0.0f;
-                    std::cout << "left side collision occured\n";
                 } else if (
                     minPlayerPos.x >= maxColliderPos.x && // Player still to the right of the collider?
                     nextMinPlayerPos.x < maxColliderPos.x // Will next prediction position penetrate
                 ) {
                     nextPos.x = maxColliderPos.x + player.dimensions.x * 0.5f;
                     speed.x = 0.0f;
-                    std::cout << "right side collision occured\n";
                 }
 
             }
@@ -112,7 +110,6 @@ struct World {
                 ) {
                     speed.z = 0.0f;
                     nextPos.z = maxColliderPos.z + player.dimensions.z * 0.5f;
-                    std::cout << "Rear side collision occured\n";
                 } else if (
                     speed.z > 0 &&
                     maxPlayerPos.z <= minColliderPos.z &&
@@ -120,7 +117,6 @@ struct World {
                 ) {
                     speed.z = 0.0f;
                     nextPos.z = minColliderPos.z - player.dimensions.z * 0.5f;
-                    std::cout << "Front collision occured\n";
                 }
             }
         }
@@ -146,9 +142,6 @@ struct World {
                 nextMaxPlayerPos.y > minColliderPos.y &&
                 nextMinPlayerPos.y < maxColliderPos.y
                 ) { //If so...
-                std::cout << "Current minPlayerY: " << minPlayerPos.y << "\n";
-                std::cout << "nextMinPlayerY: " << nextMinPlayerPos.y << "\n";
-                std::cout << "maxColliderY: " << maxColliderPos.y << "\n";
                 if (// Will the player collide from the bottom of the collider?
                     //speed.y > 0.0f &&
                     maxPlayerPos.y <= minColliderPos.y &&
@@ -157,7 +150,6 @@ struct World {
                     speed.y = 0.0f;
                     nextPos.y = minColliderPos.y - player.dimensions.y * 0.5f;
                 } else if (// Or from the top?
-                    //speed.y < 0.0f &&
                     const float EPS = 0.001f; // Need to use this, otherwise imprecision will cause this not to trigger when it shouldn't
                     minPlayerPos.y >= maxColliderPos.y -EPS &&
                     nextMinPlayerPos.y < maxColliderPos.y
@@ -165,7 +157,6 @@ struct World {
                     speed.y = 0;
                     nextPos.y = maxColliderPos.y + player.dimensions.y * 0.5f;
                     player.isResting = true;
-                    //std::cout << collider.position.x << ", " << collider.position.y << ", " << collider.position.z << "\n";
                 }
             }
         }
@@ -246,10 +237,6 @@ int main() {
     Collider groundCollider = {groundPos, groundDimensions};
     std::vector<Collider> colliders = {groundCollider};
     int numberOfPlatforms = 15;
-    // Randomly generated platforms
-    /*auto frand = [](float max) {
-        return (float(rand()) / float(RAND_MAX)) * max;
-    };*/
     auto frandSigned = [](float range) {
         return ((float(rand()) / float(RAND_MAX)) * 2.0f - 1.0f) * range;
     };

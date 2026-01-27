@@ -2,199 +2,108 @@
 #include <raymath.h>
 #include <iostream>
 #include <vector>
-#include <random>
 #include <ranges>
-#include <ctime>
 
-constexpr float GRAVITY = 0.1f;
-float acceleration = 10.f;
-Vector3 speed = {0.0f, 0.0f, 0.0f};
 
-struct Player {
-    // Constructor
-    Player(const Vector3& pos, const Vector3& dims)
-        : position(pos), dimensions(dims){}
-    // Members
-    Vector3 position;
-    Vector3 dimensions;
-    Color color = RED;
-    bool isResting = false;
-
-};
-
-struct Collider {
+// The most basic unit will be objects
+struct Object {
+    // Member variables
     Vector3 position;
     Vector3 dimensions;
     Color color;
-    // According to ChatGPT using const references is more efficient (though it doesn't matter that much right now)
-    Collider(const Vector3& pos, const Vector3& dims)
-    : position(pos), dimensions(dims), color(SKYBLUE) {}
-
-};
-
-// Game world struct
-struct World {
+    Vector3 speed;
+    bool isResting;
+    bool doesCollide;
     // Constructor
-    World(std::vector<Collider>& colliders, Player& player)
-        : colliders(colliders), player(player) {}
-    // Members
-    std::vector<Collider>& colliders;
-    Player& player;
+    Object(
+        Vector3 pos,
+        Vector3 dims,
+        Color col,
+        Vector3 speed ={0, 0, 0},
+        bool resting = false,
+        bool collides = false)
+        :
+    position(pos),
+    dimensions(dims),
+    speed(speed),
+    color(col)
+     {
+         isResting = resting;
+         doesCollide = collides;
+     }
+};
 
-    // Functions to resolve collision
+class MovementSystem {
+    public:
+    static void HandleMovement(Object& A, Object& B) {
+        Vector3 minA = A.position - A.dimensions * 0.5f;
+        Vector3 maxA = A.position + A.dimensions * 0.5f;
+        Vector3 minB = B.position - B.dimensions * 0.5f;
+        Vector3 maxB = B.position + B.dimensions * 0.5f;
 
-    // Repeated same logic for Z axis
-    void resolveX(Vector3& nextPos, Vector3& speed)
-    {
-        // Current max and min bounds for player
-        Vector3 maxPlayerPos = player.position + player.dimensions * 0.5f;
-        Vector3 minPlayerPos = player.position - player.dimensions * 0.5f;
-        // Obtain the next max and min bounds of the player
-        Vector3 nextMaxPlayerPos = nextPos + player.dimensions * 0.5f;
-        Vector3 nextMinPlayerPos = nextPos - player.dimensions * 0.5f;
-        for (const Collider& collider : colliders) {
-            Vector3 maxColliderPos = collider.position + collider.dimensions * 0.5f;
-            Vector3 minColliderPos = collider.position - collider.dimensions * 0.5f;
-            // Check Z and Y gating for next position
+        Vector3 nextMinA = minA + A.speed * GetFrameTime();
+        Vector3 nextMaxA = maxA + A.speed * GetFrameTime();
+        Vector3 nextMinB = minB + B.speed * GetFrameTime();
+        Vector3 nextMaxB = maxB + B.speed * GetFrameTime();
+
+        // X resolution
+        // Other axes alligned to allow colision next frame?
+        if (nextMaxA.y > nextMinB.y &&
+            nextMinA.y < nextMaxB.y &&
+            nextMaxA.z > nextMinB.z &&
+            nextMinA.z < nextMaxB.z) {
+            const float EPS = 0.001f;
             if (
-                // Y overlap
-                nextMaxPlayerPos.y > minColliderPos.y &&
-                nextMinPlayerPos.y < maxColliderPos.y &&
-                // Z overlap
-                nextMaxPlayerPos.z > minColliderPos.z &&
-                nextMinPlayerPos.z < maxColliderPos.z
-            ) {
-                if (
-                    maxPlayerPos.x <= minColliderPos.x && // Player still left of the collider in current pos?
-                    nextMaxPlayerPos.x > minColliderPos.x // Will next predicted position penetrate? (Approach vulnerable to tunneling)
-                ) {
-                    nextPos.x = minColliderPos.x - player.dimensions.x * 0.5f; // If true, clamp nextPos to appropriate bounds
-                    speed.x = 0.0f;
-                } else if (
-                    minPlayerPos.x >= maxColliderPos.x && // Player still to the right of the collider?
-                    nextMinPlayerPos.x < maxColliderPos.x // Will next prediction position penetrate
-                ) {
-                    nextPos.x = maxColliderPos.x + player.dimensions.x * 0.5f;
-                    speed.x = 0.0f;
-                }
-
-            }
+                maxA.x <= minB.x - EPS &&
+                nextMaxA.x > nextMinB.x) A.speed.x = 0.0f;
+            else if (
+                minA.x >= maxB.x - EPS &&
+                nextMinA.x < nextMaxB.x) A.speed.x = 0.0f;
         }
-        // Resolve X
-        player.position.x = nextPos.x;
-    }
+        A.position.x += A.speed.x * GetFrameTime();
 
-    void resolveZ(Vector3& nextPos, Vector3& speed) {
-        Vector3 maxPlayerPos = player.position + player.dimensions * 0.5f;
-        Vector3 minPlayerPos = player.position - player.dimensions * 0.5f;
-        Vector3 nextMaxPlayerPos = nextPos + player.dimensions * 0.5f;
-        Vector3 nextMinPlayerPos = nextPos - player.dimensions * 0.5f;
-
-        for (const Collider& collider : colliders) {
-            Vector3 maxColliderPos = collider.position + collider.dimensions * 0.5f;
-            Vector3 minColliderPos = collider.position - collider.dimensions * 0.5f;
-
-            // Check X and Y overlaps for next position
+        // Z resolution
+        // Other axes alligned to allow colision next frame?
+        if (nextMaxA.y > nextMinB.y &&
+            nextMinA.y < nextMaxB.y &&
+            nextMaxA.x > nextMinB.x &&
+            nextMinA.x < nextMaxB.x) {
+            const float EPS = 0.001f;
             if (
-                nextMaxPlayerPos.y > minColliderPos.y &&
-                nextMinPlayerPos.y < maxColliderPos.y &&
-                nextMaxPlayerPos.x > minColliderPos.x &&
-                nextMinPlayerPos.x < maxColliderPos.x
-                ) {
-
-                // Check collision for Z axis
-                if (
-                    speed.z < 0.0f &&
-                    minPlayerPos.z >= maxColliderPos.z &&
-                    nextMinPlayerPos.z < maxColliderPos.z
-                ) {
-                    speed.z = 0.0f;
-                    nextPos.z = maxColliderPos.z + player.dimensions.z * 0.5f;
-                } else if (
-                    speed.z > 0 &&
-                    maxPlayerPos.z <= minColliderPos.z &&
-                    nextMaxPlayerPos.z > minColliderPos.z
-                ) {
-                    speed.z = 0.0f;
-                    nextPos.z = minColliderPos.z - player.dimensions.z * 0.5f;
-                }
+                maxA.z <= minB.z - EPS &&
+                nextMaxA.z > nextMinB.z) A.speed.z = 0.0f;
+            else if (
+                minA.z >= maxB.z - EPS &&
+                nextMinA.z < nextMaxB.z) A.speed.z = 0.0f;
             }
-        }
-        player.position.z = nextPos.z;
-    }
+        A.position.z += A.speed.z * GetFrameTime();
 
-    void resolveY(Vector3& nextPos, Vector3& speed) {
-        Vector3 maxPlayerPos = player.position + player.dimensions * 0.5f;
-        Vector3 minPlayerPos = player.position - player.dimensions * 0.5f;
-        Vector3 nextMaxPlayerPos = nextPos + player.dimensions * 0.5f;
-        Vector3 nextMinPlayerPos = nextPos - player.dimensions * 0.5f;
-
-        for (const Collider& collider : colliders) {
-            Vector3 maxColliderPos = collider.position + collider.dimensions * 0.5f;
-            Vector3 minColliderPos = collider.position - collider.dimensions * 0.5f;
-
+        // Y resolution
+        // Other axes alligned to allow colision next frame?
+        if (nextMaxA.z > nextMinB.z &&
+            nextMinA.z < nextMaxB.z &&
+            nextMaxA.x > nextMinB.x &&
+            nextMinA.x < nextMaxB.x) {
+            const float EPS = 0.001f;
             if (
-                // Will next pos trigger overlap with any iterated collider?
-                maxPlayerPos.x > minColliderPos.x &&
-                minPlayerPos.x < maxColliderPos.x &&
-                maxPlayerPos.z > minColliderPos.z &&
-                minPlayerPos.z < maxColliderPos.z &&
-                nextMaxPlayerPos.y > minColliderPos.y &&
-                nextMinPlayerPos.y < maxColliderPos.y
-                ) { //If so...
-                if (// Will the player collide from the bottom of the collider?
-                    //speed.y > 0.0f &&
-                    maxPlayerPos.y <= minColliderPos.y &&
-                    nextMaxPlayerPos.y > minColliderPos.y
-                    ) {
-                    speed.y = 0.0f;
-                    nextPos.y = minColliderPos.y - player.dimensions.y * 0.5f;
-                } else if (// Or from the top?
-                    const float EPS = 0.001f; // Need to use this, otherwise imprecision will cause this not to trigger when it shouldn't
-                    minPlayerPos.y >= maxColliderPos.y -EPS &&
-                    nextMinPlayerPos.y < maxColliderPos.y
-                    ) {
-                    speed.y = 0;
-                    nextPos.y = maxColliderPos.y + player.dimensions.y * 0.5f;
-                    player.isResting = true;
-                }
+                maxA.y <= minB.y - EPS &&
+                nextMaxA.y > nextMinB.y) A.speed.z = 0.0f;
+            else if (
+                minA.y >= maxB.y - EPS &&
+                nextMinA.y < nextMaxB.y) A.speed.z = 0.0f;
             }
-        }
-        player.position.y = nextPos.y;
+        A.position.y += A.speed.y * GetFrameTime();
+
     }
 };
 
-struct Renderer {
-    const World& world;
-    Renderer(const World& world): world(world) {};
-
-    void Draw() const {
-
-        for (Collider collider : world.colliders) {
-            DrawCube(collider.position,
-                collider.dimensions.x,
-                collider.dimensions.y,
-                collider.dimensions.z,
-                collider.color);
-            DrawCubeWires(collider.position,
-                collider.dimensions.x,
-                collider.dimensions.y,
-                collider.dimensions.z,
-                BLACK);
-        }
-
-        DrawCube(world.player.position,
-            world.player.dimensions.x,
-            world.player.dimensions.y,
-            world.player.dimensions.z,
-            world.player.color);
-        DrawCubeWires(world.player.position,
-            world.player.dimensions.x,
-            world.player.dimensions.y,
-            world.player.dimensions.z,
-            BLACK);
-
-    };
+class Renderer {
+    public :
+     static void Draw(const std::vector<Object*>& objects) {
+         for (Object* obj : objects) {
+             DrawCube(obj->position, obj->dimensions.x, obj->dimensions.y, obj->dimensions.z, obj->color);
+         }
+    }
 };
 
 // Functions to handle movement
@@ -226,44 +135,20 @@ int main() {
     camera.up       = { 0.0f, 1.0f, 0.0f };
     camera.fovy     = 15.0f;                    // ignored for orthographic
     camera.projection = CAMERA_ORTHOGRAPHIC;
-    // Cube
+    // Player Cube
     Vector3 cubePos = {0.0f, 1.0f, 0.0f};
     Vector3 cubeDim = {0.5f, 1.0f, 0.5f};
-    Player player(cubePos, cubeDim);
-    // Generate colliders for the game
-    // Ground level
+    Object player = {cubePos, cubeDim, RED, {0.0f, 0.0f , 0.0f}};
+
+    // Colliders
     Vector3 groundDimensions = {30.0f, 0.05f, 30.0f};
     Vector3 groundPos = {0.0f, 0.475f, 0.0f};
-    Collider groundCollider = {groundPos, groundDimensions};
-    std::vector<Collider> colliders = {groundCollider};
-    int numberOfPlatforms = 15;
-    auto frandSigned = [](float range) {
-        return ((float(rand()) / float(RAND_MAX)) * 2.0f - 1.0f) * range;
-    };
+    Object collider({5.0f, 0.5f, 5.0f}, cubeDim, YELLOW);
 
-    srand((unsigned int)time(nullptr));
-    for (int i = 0; i < numberOfPlatforms; i++) {
-
-        Vector3 pos ={
-            frandSigned(groundCollider.position.x + groundDimensions.x * 0.5f),
-            0.5f,
-            frandSigned(groundCollider.position.z + groundDimensions.z * 0.5f),
-        };
-        Vector3 dim = {
-            1.0f,
-            10.0f,
-            1.0f,
-        };
-
-        Collider collider = {pos, dim};
-        collider.color = RED;
-        colliders.push_back(collider);
-    }
+    std::vector<Object*> objects = {&player, &collider};
 
     // Initialize nextPos to starting player position
     Vector3 nextPos = player.position;
-    World world(colliders, player);
-    Renderer renderer(world);
     SetTargetFPS(60);
     DisableCursor();
     float GameOverTimer = 0.0f;
@@ -281,34 +166,15 @@ int main() {
                 if (IsKeyDown(KEY_S)) move = Vector3Subtract(move, forward);
                 if (IsKeyDown(KEY_D)) move = Vector3Add(move, right);
                 if (IsKeyDown(KEY_A)) move = Vector3Subtract(move, right);
+                if (IsKeyPressed(KEY_SPACE)) player.speed.y = 2.0f;
 
                 move = Vector3Normalize(move);
 
-                speed.x = move.x * 10.0f;
-                speed.z = move.z * 10.0f;
+                player.speed.x = move.x * 5.0f;
+                player.speed.z = move.z * 5.0f;
+                MovementSystem::HandleMovement(player, collider);
+                //player.position += player.speed * GetFrameTime();
 
-                player.isResting = false; // reset at the start of each, resolveY will determine whether jump allowed or not
-                /*// Simple movement controls
-                if (IsKeyDown(KEY_W)) speed.z = -10.0f;
-                else if (IsKeyDown(KEY_S)) speed.z = 10.0f;
-                else speed.z = 0.0f;
-                if (IsKeyDown(KEY_A)) speed.x = -10.0f;
-                else if (IsKeyDown(KEY_D)) speed.x = 10.0f;
-                else speed.x = 0.0f;*/
-
-                // Handle lateral movement and collision
-                nextPos.x = player.position.x + speed.x * GetFrameTime();
-                world.resolveX(nextPos, speed);
-                nextPos.z = player.position.z + speed.z * GetFrameTime();
-                world.resolveZ(nextPos, speed);
-                // Handle vertical movement and collision
-                // Apply gravity
-                speed.y -= 10.5f * GetFrameTime();
-
-                nextPos.y = player.position.y + speed.y * GetFrameTime();
-                world.resolveY(nextPos, speed);
-                // Now that Y has determined if player is resting, add jump logic
-                if (IsKeyPressed(KEY_SPACE) && player.isResting) speed.y = 7.0f;
 
                 // Change player color depending on state
                 if (player.isResting) player.color = GREEN; else player.color = RED;
@@ -327,18 +193,20 @@ int main() {
                 BeginDrawing();
                 ClearBackground(RAYWHITE);
                 BeginMode3D(camera);
-                renderer.Draw();
-                DrawCube({5.0f, 1.0f, 5.0f}, 0.5f, 0.5f, 0.5f, BLACK);
+                Renderer::Draw(objects);
                 DrawGrid(10, 1.0f); // 10x10 grid
                 EndMode3D();
                 DrawText("Use WASD to move the cube", 10, 10, 20, DARKGRAY);
+                DrawText(TextFormat("Player position Y %.2f", player.position.y), 500, 500, 20, BLACK );
+                DrawText(TextFormat("Player speed X %.2f", player.speed.x), 500, 700, 20, BLACK );
+                DrawText(TextFormat("Collider position X %.2f", collider.position.x), 500, 600, 20, BLACK);
                 if (player.position.x < 6.0f &&
                     player.position.x > 4.0f &&
                     player.position.z < 6.0f &&
                     player.position.z > 4.0f &&
                     player.position.y > 0.9f &&
                     player.position.y < 1.5f) {
-                    DrawText("Press E to speak", 500, 500, 20, YELLOW );
+
                     if (IsKeyPressed(KEY_E)) { textTimer = 3.0f;}
                     }
                 if (textTimer > 0.0f) {
@@ -351,7 +219,6 @@ int main() {
                 if (textTimer < 0.0f) textTimer = 0.0f;
                 DrawFPS(600, 10);
                 EndDrawing();
-                std::cout << GameOverTimer << std::endl;
             } else {
                 if (IsCursorHidden())EnableCursor();
                 BeginDrawing();
@@ -372,7 +239,7 @@ int main() {
                     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                         player.position = {
                             0.0f,
-                            groundCollider.position.y + groundDimensions.y * 0.5f + player.dimensions.y * 0.5f,
+                            collider.position.y + groundDimensions.y * 0.5f + player.dimensions.y * 0.5f,
                             0.f};
                         GameOverTimer = 0.0f;
                     }

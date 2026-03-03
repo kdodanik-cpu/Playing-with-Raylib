@@ -7,6 +7,7 @@
 #include "basics.h"
 #include <vector>
 
+// Necessary for this
 struct Collision
 {
   Object* A;
